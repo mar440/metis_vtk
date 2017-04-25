@@ -31,3 +31,5 @@
 *.txt
 build
 build/
+
+*.sw*
