@@ -33,3 +33,4 @@ build
 build/
 
 *.sw*
+CMakeLists.txt.user
