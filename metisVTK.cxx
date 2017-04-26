@@ -155,6 +155,7 @@ int main(int argc, char *argv[])
     options[METIS_OPTION_UFACTOR  ] = 1;
     options[METIS_OPTION_NUMBERING] = 0; // C-style numbering
     options[METIS_OPTION_DBGLVL   ] = METIS_DBG_INFO;
+    options[METIS_OPTION_CONTIG   ] = 1;
 
     int nparts = 1;
     int objval;
