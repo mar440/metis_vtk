@@ -86,29 +86,33 @@ int main(int argc, char *argv[])
 
     int _i, nCellArr = imesh->GetNumberOfCellArrays();
     string str_i;
+    bool flagPartitionId = false;
     for (_i = 0; _i < nCellArr ; _i++) {
         str_i = imesh->GetCellArrayName(_i);
         if (str_i.compare("PartitionId") == 0){
+            bool flagPartitionId = true;
             break;
         }
     }
-    cout << str_i << endl;
     int nb_node = imesh->GetNumberOfPoints();
     int nb_elmt = imesh->GetNumberOfCells();
     cout << "imesh->GetNumberOfPoints();" << nb_node << endl;
     cout << "imesh->GetNumberOfCells();" << nb_elmt << endl;
-    vtkDataArray * PartitionId = imesh->GetOutput()->GetCellData()->GetArray("PartitionId");
-    vtkCellArray * offset = imesh->GetOutput()->GetCells();
 
-    int ds = PartitionId->GetDataSize();
+    vtkDataArray * PartitionId;
+    if (flagPartitionId){
+         PartitionId = imesh->GetOutput()->GetCellData()->GetArray("PartitionId");
+    }
+    else{
+    //    vtkSmartPointer<vtkIntArray> _vtkDataArray_PartId = vtkSmartPointer<vtkIntArray>::New();
+        PartitionId = vtkIntArray::New();
+        imesh->GetOutput()->GetCellData()->AddArray(PartitionId);
+        PartitionId->SetName("PartitionId");
+        PartitionId->SetNumberOfComponents(1);
+        PartitionId->SetNumberOfTuples(nb_elmt);
+    }
 
-    cout << "PartitionId.GetDataSize() = " << ds << endl;
-    cout << "nb_elmt                   = " << nb_elmt << endl;
-
-
-    cout << "offset->GetDataSize() = " << offset->GetSize()  << endl;
-
-
+#if 1
     vtkSmartPointer<vtkGenericCell> cell = vtkSmartPointer<vtkGenericCell>::New();
     int nPi;
     int * eptr = new int[nb_elmt + 1];
@@ -189,17 +193,25 @@ int main(int argc, char *argv[])
         PartitionId->SetTuple(i,tuple);
     }
 
+   // imesh->AddArray(PartitionId);
+
+
+
     delete [] epart;
     delete [] npart;
     delete [] eptr;
     delete [] eind;
 
+
     string fname = "dmpFls/modifiedFile_" + to_string(nparts) + "_subs.vtu";
     vtkSmartPointer<vtkUnstructuredGrid> ModelMesh = vtkSmartPointer<vtkUnstructuredGrid>::New();
     ModelMesh->ShallowCopy(imesh->GetOutput());
-
     printVTK(ModelMesh,fname);
+#endif
 
+    if (!flagPartitionId){
+       PartitionId->Delete();
+    }
     return EXIT_SUCCESS;
 }
 
