@@ -31,9 +31,19 @@
 #include <set>
 #include <stdexcept>
 #include "metis.h"
+#include <vtkConnectivityFilter.h>
+#include <vtkIdTypeArray.h>
 
 using namespace std;
-bool asciiOrBinaryVtu = false;
+bool asciiOrBinaryVtu = true;
+
+
+#ifndef VTK_CREATE
+// To create a smart pointer
+#define VTK_CREATE(type, name) \
+    vtkSmartPointer<type> name = vtkSmartPointer<type>::New()
+#endif
+
 
 void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fname){
     cout <<"vtkVersion: " << vtkVersion::GetVTKMajorVersion() << "\n";
@@ -48,6 +58,45 @@ void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fnam
     }
     writer->SetInputData(_unstructuredGrid);
     writer->Write();
+}
+
+
+vtkUnstructuredGrid* ThresoldSelection(vtkUnstructuredGrid* usg, std::string fieldName, std::vector<int> values)
+{
+    if (values.size() == 1)
+    {
+        //WriteUG(usg, "C:\\Users\\a0h72255\\Desktop\\test.vtu");
+        VTK_CREATE(vtkThreshold, threshold);
+        threshold->SetInputData(usg);
+        threshold->ThresholdBetween(values[0] - 0.1, values[0] + 0.1);
+        threshold->SetInputArrayToProcess(0, 0, 0, 1, fieldName.c_str());
+        threshold->Update();
+
+        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
+        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(threshold->GetOutput()));
+        return res;
+    }
+    // else make an append filter of all the material ids
+    else
+    {
+        VTK_CREATE(vtkAppendFilter, aFilter);
+        aFilter->MergePointsOff();
+        for (auto i : values)
+        {
+            VTK_CREATE(vtkThreshold, threshold);
+            threshold->SetInputData(usg);
+            threshold->ThresholdBetween(i - 0.1, i + 0.1);
+            threshold->SetInputArrayToProcess(0, 0, 0, 1, fieldName.c_str());
+            threshold->Update();
+
+            aFilter->AddInputData(threshold->GetOutput());
+        }
+
+        aFilter->Update();
+        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
+        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(aFilter->GetOutput()));
+        return res;
+    }
 }
 
 int main(int argc, char *argv[])
@@ -105,10 +154,100 @@ int main(int argc, char *argv[])
 
 
 
+    vtkSmartPointer<vtkConnectivityFilter> connectivityFilter =
+    vtkSmartPointer<vtkConnectivityFilter>::New();
+//    vtkConnectivityFilter * connectivityFilter = vtkConnectivityFilter::New();
+    connectivityFilter->SetInputConnection(imesh->GetOutputPort());
+    connectivityFilter->SetExtractionModeToAllRegions();
+    connectivityFilter->ColorRegionsOn();
+    connectivityFilter->Update();
+    cout << " MEMORY   after del: " << connectivityFilter->GetOutput()->GetActualMemorySize() << endl;
+
+
+    string fname2 = "dmpFls/Region.vtu";
+    printVTK(connectivityFilter->GetOutput(),fname2);
+
+
+    int nDom = connectivityFilter->GetNumberOfExtractedRegions();
+    cout << "nDom               = " << nDom << endl;
+
+    vtkIdTypeArray * _RegionId = vtkIdTypeArray::SafeDownCast(connectivityFilter->GetOutput()->GetCellData()->GetArray("RegionId"));
+
+    if (_RegionId == NULL){
+        cout << " _RegionId is null pointer ... \n";
+        return(1);
+    }
+
+//    int* p = static_cast<int*>(_RegionId->GetVoidPointer(0));
+//    vector<int> regionIdArray_vector(p, p + _RegionId->GetNumberOfTuples());
+
+    vtkSmartPointer<vtkGenericCell> cell_imesh = vtkSmartPointer<vtkGenericCell>::New();
+    vtkSmartPointer<vtkGenericCell> cell_connect = vtkSmartPointer<vtkGenericCell>::New();
 
 
 
-#if 1
+    cout << _RegionId->GetNumberOfTuples() << endl;
+    int cnt000 = 0;
+    for (int i = 0; i < nb_elmt; i++){
+       imesh->GetOutput()->GetCell(i,cell_imesh);
+       imesh->GetOutput()->GetCell(i,cell_connect);
+//       for (int j = 0; j < cell_imesh->GetNumberOfPoints(); j++){
+//           cout << cell_imesh->GetPointId(j) << " " <<  cell_connect->GetPointId(j) << endl;
+//       }
+    }
+
+    cout << " cnt000: " << cnt000 << endl;
+    //connectivityFilter->Delete();
+
+
+
+
+//    for (int i = 0; i < nDom; i++){
+//
+//        vtkSmartPointer<vtkSelection> selection = vtkSmartPointer<vtkSelection>::New();
+//        vtkSmartPointer<vtkSelectionNode> selPiece = vtkSmartPointer<vtkSelectionNode>::New();
+//        vtkSmartPointer<vtkExtractSelection> extract = vtkSmartPointer<vtkExtractSelection>::New();
+//
+//        selPiece->SetFieldType(vtkSelectionNode::CELL);
+//
+//        selPiece->SetContentType(vtkSelectionNode::INDICES);
+//
+//
+//        vtkSmartPointer<vtkIdTypeArray> pieceIds = vtkSmartPointer<vtkIdTypeArray>::New();
+//        pieceIds->SetName("RegionId");
+//        pieceIds->InsertNextValue(i);
+//        selPiece->SetSelectionList(pieceIds);
+//
+//
+//        // Prepare selection (add the selNode) and the extractor
+//        selection->AddNode(selPiece);
+//
+//        // Extract the selection
+//
+//        extract->SetInputData(0, connectivityFilter->GetOutput());
+//        extract->SetInputData(1, selection);
+//        extract->PreserveTopologyOff();
+//        extract->Update();
+//
+//        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
+//        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(extract->GetOutput()));
+//
+//        string fname1 = "dmpFls/Region_" + to_string(i) + ".vtu";
+//        vtkSmartPointer<vtkUnstructuredGrid> ModelMesh1 = vtkSmartPointer<vtkUnstructuredGrid>::New();
+//        ModelMesh1->ShallowCopy(res);
+//        printVTK(ModelMesh1,fname1);
+//
+//
+//    }
+
+
+
+
+
+
+
+
+#if 0
     vtkSmartPointer<vtkGenericCell> cell = vtkSmartPointer<vtkGenericCell>::New();
     int nPi;
     int * eptr = new int[nb_elmt + 1];
