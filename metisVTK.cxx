@@ -38,11 +38,11 @@ using namespace std;
 bool asciiOrBinaryVtu = true;
 
 
-#ifndef VTK_CREATE
-// To create a smart pointer
-#define VTK_CREATE(type, name) \
-    vtkSmartPointer<type> name = vtkSmartPointer<type>::New()
-#endif
+//#ifndef VTK_CREATE
+// // To create a smart pointer
+//#define VTK_CREATE(type, name) \
+//    vtkSmartPointer<type> name = vtkSmartPointer<type>::New()
+//#endif
 
 
 void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fname){
@@ -61,208 +61,25 @@ void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fnam
 }
 
 
-vtkUnstructuredGrid* ThresoldSelection(vtkUnstructuredGrid* usg, std::string fieldName, std::vector<int> values)
-{
-    if (values.size() == 1)
-    {
-        //WriteUG(usg, "C:\\Users\\a0h72255\\Desktop\\test.vtu");
-        VTK_CREATE(vtkThreshold, threshold);
-        threshold->SetInputData(usg);
-        threshold->ThresholdBetween(values[0] - 0.1, values[0] + 0.1);
-        threshold->SetInputArrayToProcess(0, 0, 0, 1, fieldName.c_str());
-        threshold->Update();
+void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkSmartPointer<vtkDataArray> globalPartitionId, int _nparts, int prevPartitionId){
 
-        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
-        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(threshold->GetOutput()));
-        return res;
-    }
-    // else make an append filter of all the material ids
-    else
-    {
-        VTK_CREATE(vtkAppendFilter, aFilter);
-        aFilter->MergePointsOff();
-        for (auto i : values)
-        {
-            VTK_CREATE(vtkThreshold, threshold);
-            threshold->SetInputData(usg);
-            threshold->ThresholdBetween(i - 0.1, i + 0.1);
-            threshold->SetInputArrayToProcess(0, 0, 0, 1, fieldName.c_str());
-            threshold->Update();
+    int nPointsLocal = mesh_local->GetNumberOfPoints();
+    int nCellsLocal = mesh_local->GetNumberOfCells();
 
-            aFilter->AddInputData(threshold->GetOutput());
-        }
-
-        aFilter->Update();
-        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
-        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(aFilter->GetOutput()));
-        return res;
-    }
-}
-
-int main(int argc, char *argv[])
-{
-    if (argc != 3){
-        cout << "!!!  Number of arguments is incorrect !!!\n" << endl;
-        string str0 = "/path/to/mesh.vtu";
-        cout << "To decompose the mesh (stored in "<< str0 <<") into, e.g., " <<
-                "3 subdomains, call:\n\n\n \t\t\t./metisVTK "<<str0<< " 3\n\n\n";
-        return 0;
-    }
-
-    string filename = argv[1];
-    string _nparts_str = argv[2];
-
-    int _nparts = stoi(_nparts_str);
-
-    cout << "numb. of inp.             " << argc << endl;
-    cout << "file name to be readed is " << filename << endl;
-    cout << "nparts from command line: " << _nparts << endl;
-
-
-    //read all the data from the file
-    vtkSmartPointer<vtkXMLUnstructuredGridReader> imesh =
-            vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
-    imesh->SetFileName(filename.c_str());
-    imesh->Update();
-
-    int _i, nCellArr = imesh->GetNumberOfCellArrays();
-    string str_i;
-    bool flagPartitionId = false;
-    for (_i = 0; _i < nCellArr ; _i++) {
-        str_i = imesh->GetCellArrayName(_i);
-        if (str_i.compare("PartitionId") == 0){
-            flagPartitionId = true;
-            break;
-        }
-    }
-    int nb_node = imesh->GetNumberOfPoints();
-    int nb_elmt = imesh->GetNumberOfCells();
-    cout << "imesh->GetNumberOfPoints();" << nb_node << endl;
-    cout << "imesh->GetNumberOfCells();" << nb_elmt << endl;
-
-    vtkDataArray * PartitionId;
-    if (flagPartitionId){
-         PartitionId = imesh->GetOutput()->GetCellData()->GetArray("PartitionId");
-    }
-    else{
-        PartitionId = vtkIntArray::New();
-        imesh->GetOutput()->GetCellData()->AddArray(PartitionId);
-        PartitionId->SetName("PartitionId");
-        PartitionId->SetNumberOfComponents(1);
-        PartitionId->SetNumberOfTuples(nb_elmt);
-    }
-
-
-
-    vtkSmartPointer<vtkConnectivityFilter> connectivityFilter =
-    vtkSmartPointer<vtkConnectivityFilter>::New();
-//    vtkConnectivityFilter * connectivityFilter = vtkConnectivityFilter::New();
-    connectivityFilter->SetInputConnection(imesh->GetOutputPort());
-    connectivityFilter->SetExtractionModeToAllRegions();
-    connectivityFilter->ColorRegionsOn();
-    connectivityFilter->Update();
-    cout << " MEMORY   after del: " << connectivityFilter->GetOutput()->GetActualMemorySize() << endl;
-
-
-    string fname2 = "dmpFls/Region.vtu";
-    printVTK(connectivityFilter->GetOutput(),fname2);
-
-
-    int nDom = connectivityFilter->GetNumberOfExtractedRegions();
-    cout << "nDom               = " << nDom << endl;
-
-    vtkIdTypeArray * _RegionId = vtkIdTypeArray::SafeDownCast(connectivityFilter->GetOutput()->GetCellData()->GetArray("RegionId"));
-
-    if (_RegionId == NULL){
-        cout << " _RegionId is null pointer ... \n";
-        return(1);
-    }
-
-//    int* p = static_cast<int*>(_RegionId->GetVoidPointer(0));
-//    vector<int> regionIdArray_vector(p, p + _RegionId->GetNumberOfTuples());
-
-    vtkSmartPointer<vtkGenericCell> cell_imesh = vtkSmartPointer<vtkGenericCell>::New();
-    vtkSmartPointer<vtkGenericCell> cell_connect = vtkSmartPointer<vtkGenericCell>::New();
-
-
-
-    cout << _RegionId->GetNumberOfTuples() << endl;
-    int cnt000 = 0;
-    for (int i = 0; i < nb_elmt; i++){
-       imesh->GetOutput()->GetCell(i,cell_imesh);
-       imesh->GetOutput()->GetCell(i,cell_connect);
-//       for (int j = 0; j < cell_imesh->GetNumberOfPoints(); j++){
-//           cout << cell_imesh->GetPointId(j) << " " <<  cell_connect->GetPointId(j) << endl;
-//       }
-    }
-
-    cout << " cnt000: " << cnt000 << endl;
-    //connectivityFilter->Delete();
-
-
-
-
-//    for (int i = 0; i < nDom; i++){
-//
-//        vtkSmartPointer<vtkSelection> selection = vtkSmartPointer<vtkSelection>::New();
-//        vtkSmartPointer<vtkSelectionNode> selPiece = vtkSmartPointer<vtkSelectionNode>::New();
-//        vtkSmartPointer<vtkExtractSelection> extract = vtkSmartPointer<vtkExtractSelection>::New();
-//
-//        selPiece->SetFieldType(vtkSelectionNode::CELL);
-//
-//        selPiece->SetContentType(vtkSelectionNode::INDICES);
-//
-//
-//        vtkSmartPointer<vtkIdTypeArray> pieceIds = vtkSmartPointer<vtkIdTypeArray>::New();
-//        pieceIds->SetName("RegionId");
-//        pieceIds->InsertNextValue(i);
-//        selPiece->SetSelectionList(pieceIds);
-//
-//
-//        // Prepare selection (add the selNode) and the extractor
-//        selection->AddNode(selPiece);
-//
-//        // Extract the selection
-//
-//        extract->SetInputData(0, connectivityFilter->GetOutput());
-//        extract->SetInputData(1, selection);
-//        extract->PreserveTopologyOff();
-//        extract->Update();
-//
-//        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
-//        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(extract->GetOutput()));
-//
-//        string fname1 = "dmpFls/Region_" + to_string(i) + ".vtu";
-//        vtkSmartPointer<vtkUnstructuredGrid> ModelMesh1 = vtkSmartPointer<vtkUnstructuredGrid>::New();
-//        ModelMesh1->ShallowCopy(res);
-//        printVTK(ModelMesh1,fname1);
-//
-//
-//    }
-
-
-
-
-
-
-
-
-#if 0
     vtkSmartPointer<vtkGenericCell> cell = vtkSmartPointer<vtkGenericCell>::New();
     int nPi;
-    int * eptr = new int[nb_elmt + 1];
+    int * eptr = new int[nCellsLocal + 1];
     eptr[0] = 0;
-    for (int i = 0 ; i < nb_elmt; i++){
-        imesh->GetOutput()->GetCell(i,cell);
+    for (int i = 0 ; i < nCellsLocal; i++){
+        mesh_local->GetCell(i,cell);
         nPi = cell->GetNumberOfPoints();
         eptr[i+1] = eptr[i] + nPi;
     }
-    int * eind = new int[eptr[nb_elmt]];
+    int * eind = new int[eptr[nCellsLocal]];
     int cnt = 0;
-    int nNodOnEl=0;
     int CellDim;
-    for (int i = 0 ; i < nb_elmt; i++){
-        imesh->GetOutput()->GetCell(i,cell);
+    for (int i = 0 ; i < nCellsLocal; i++){
+        mesh_local->GetCell(i,cell);
         nPi = cell->GetNumberOfPoints();
         for (int j = 0; j < nPi; j++){
             eind[cnt] = cell->GetPointId(j);
@@ -273,7 +90,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    int ncommon = 0;
+    int ncommon = 2; /* ncommon = 2 for all other types ... */
     if (CellDim == 2){
         ncommon = 2;
     }
@@ -304,18 +121,18 @@ int main(int argc, char *argv[])
        nparts = _nparts;
     }
 
-    int *epart = new int [nb_elmt];
-    int *npart = new int [eptr[nb_elmt]];
+    int *epart = new int [nCellsLocal];
+    int *npart = new int [eptr[nCellsLocal]];
 
-    METIS_PartMeshDual(&nb_elmt,        // number of elements in the mesh       Y
-                       &nb_node,        //                                      Y
+    METIS_PartMeshDual(&nCellsLocal,    // number of elements in the mesh       Y
+                       &nPointsLocal,   //                                      Y
                        eptr,            //                                      Y
                        eind,            //                                      Y
                        (int *)NULL,     // vwgt                                 Y
                        (int *)NULL,     // vsize                                Y
                        &ncommon,        //                                      Y
                        &nparts,         //                                      N
-                       (real_t*)NULL,   // tpwgts                                Y
+                       (real_t*)NULL,   // tpwgts                               Y
                        options,         //                                      Y
                        &objval,         //                                      Y
                        epart,           //                                      N
@@ -323,23 +140,200 @@ int main(int argc, char *argv[])
 
 
     double tuple[] = {0};
-    for (int i = 0 ; i < nb_elmt; i++){
-        tuple[0] = epart[i];
-        PartitionId->SetTuple(i,tuple);
+    int _i;
+
+    vtkDataArray * localPartitionId;
+    localPartitionId = mesh_local->GetCellData()->GetArray("PartitionId");
+
+
+    for (int i = 0 ; i < nCellsLocal; i++){
+        /* global PartitionId */
+        tuple[0] = epart[i] + prevPartitionId;
+        /* first: recovering the position of cell in original 'mesh_local' */
+        _i = localPartitionId->GetTuple1(i);
+        /* second: replacing by localPartitionId + (number of partitions of all previous Regions) */
+        globalPartitionId->SetTuple(_i,tuple);
     }
 
-   // imesh->AddArray(PartitionId);
+   // mesh_local->AddArray(PartitionId);
 
     delete [] epart;
     delete [] npart;
     delete [] eptr;
     delete [] eind;
 
-    string fname = "dmpFls/modifiedFile_" + to_string(nparts) + "_subs.vtu";
+}
+
+
+//vtkUnstructuredGrid* ThresoldSelection(vtkUnstructuredGrid* usg, std::string fieldName, std::vector<int> values)
+//{
+//    if (values.size() == 1)
+//    {
+//        //WriteUG(usg, "C:\\Users\\a0h72255\\Desktop\\test.vtu");
+//        VTK_CREATE(vtkThreshold, threshold);
+//        threshold->SetInputData(usg);
+//        threshold->ThresholdBetween(values[0] - 0.1, values[0] + 0.1);
+//        threshold->SetInputArrayToProcess(0, 0, 0, 1, fieldName.c_str());
+//        threshold->Update();
+//
+//        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
+//        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(threshold->GetOutput()));
+//        return res;
+//    }
+//    // else make an append filter of all the material ids
+//    else
+//    {
+//        VTK_CREATE(vtkAppendFilter, aFilter);
+//        aFilter->MergePointsOff();
+//        for (auto i : values)
+//        {
+//            VTK_CREATE(vtkThreshold, threshold);
+//            threshold->SetInputData(usg);
+//            threshold->ThresholdBetween(i - 0.1, i + 0.1);
+//            threshold->SetInputArrayToProcess(0, 0, 0, 1, fieldName.c_str());
+//            threshold->Update();
+//
+//            aFilter->AddInputData(threshold->GetOutput());
+//        }
+//
+//        aFilter->Update();
+//        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
+//        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(aFilter->GetOutput()));
+//        return res;
+//    }
+//}
+
+int main(int argc, char *argv[])
+{
+    if (argc != 3){
+        cout << "!!!  Number of arguments is incorrect !!!\n" << endl;
+        string str0 = "/path/to/mesh.vtu";
+        cout << "To decompose the mesh (stored in "<< str0 <<") into, e.g., " <<
+                "3 subdomains, call:\n\n\n \t\t\t./metisVTK "<<str0<< " 3\n\n\n";
+        return 0;
+    }
+
+    string filename = argv[1];
+    string _nparts_str = argv[2];
+
+    int _nparts = stoi(_nparts_str);
+
+    cout << "numb. of inp.             " << argc << endl;
+    cout << "file name to be readed is " << filename << endl;
+    cout << "nparts from command line: " << _nparts << endl;
+
+
+    //read all the data from the file
+    vtkSmartPointer<vtkXMLUnstructuredGridReader> meshGlobal =
+            vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
+    meshGlobal->SetFileName(filename.c_str());
+    meshGlobal->Update();
+
+    int _i, nCellArr = meshGlobal->GetNumberOfCellArrays();
+    string str_i;
+    bool flagPartitionId = false;
+    for (_i = 0; _i < nCellArr ; _i++) {
+        str_i = meshGlobal->GetCellArrayName(_i);
+        if (str_i.compare("PartitionId") == 0){
+            flagPartitionId = true;
+            break;
+        }
+    }
+    int nPointsGlobal = meshGlobal->GetNumberOfPoints();
+    int nCellsGlobal= meshGlobal->GetNumberOfCells();
+    cout << "meshGlobal->GetNumberOfPoints() = " << nPointsGlobal << endl;
+    cout << "meshGlobal->GetNumberOfCells()" << nCellsGlobal<< endl;
+
+    vtkDataArray * PartitionId;
+    if (flagPartitionId){
+         PartitionId = meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId");
+    }
+    else{
+        PartitionId = vtkIntArray::New();
+        meshGlobal->GetOutput()->GetCellData()->AddArray(PartitionId);
+        PartitionId->SetName("PartitionId");
+        PartitionId->SetNumberOfComponents(1);
+        PartitionId->SetNumberOfTuples(nCellsGlobal);
+    }
+
+    /* Partition is firstly used to store original order of cells */
+    double tuple[] = {0};
+    for (int i = 0 ; i < nCellsGlobal; i++){
+        tuple[0] = i;
+        PartitionId->SetTuple(i,tuple);
+    }
+
+
+    vtkSmartPointer<vtkConnectivityFilter> connectivityFilter =
+    vtkSmartPointer<vtkConnectivityFilter>::New();
+    connectivityFilter->SetInputConnection(meshGlobal->GetOutputPort());
+    connectivityFilter->SetExtractionModeToAllRegions();
+    connectivityFilter->ColorRegionsOn();
+    connectivityFilter->Update();
+    cout << " MEMORY   after del: " << connectivityFilter->GetOutput()->GetActualMemorySize() << endl;
+
+    int nRegions = connectivityFilter->GetNumberOfExtractedRegions();
+
+
+
+
+    /* First: get number of cells per each Region */
+    vector < int > nCellsPerRegion;
+    nCellsPerRegion.resize(nRegions);
+
+    vector < double > nPartsPerRegion;
+    nPartsPerRegion.resize(nRegions);
+
+    int nAverCellsPerRegion = nCellsGlobal / nRegions;
+
+
+    for (int i = 0; i < nRegions; i ++) {
+        vtkSmartPointer <vtkUnstructuredGrid> omega_i = vtkSmartPointer< vtkUnstructuredGrid>::New();
+        vtkSmartPointer<vtkThreshold> threshold = vtkSmartPointer<vtkThreshold>::New();
+        threshold->SetInputData(connectivityFilter->GetOutput());
+        threshold->ThresholdBetween((double)i, (double)i);
+        threshold->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "RegionId");
+        threshold->Update();
+        omega_i->ShallowCopy(threshold->GetOutput());
+
+        nCellsPerRegion[i] = omega_i->GetNumberOfCells();
+        nPartsPerRegion[i] = double( nCellsPerRegion[i]) / nAverCellsPerRegion;
+    }
+
+    for (int i = 0; i < nRegions; i++){
+        cout <<"=========================================="<< endl;
+        cout <<"nPartsPerRegion  = " << nPartsPerRegion[i] << endl;
+        cout <<"=========================================="<< endl;
+    }
+
+
+
+    int prevPartitionId = 0;
+    for (int i = 0; i < nRegions; i ++) {
+        vtkSmartPointer <vtkUnstructuredGrid> omega_i = vtkSmartPointer< vtkUnstructuredGrid>::New();
+        vtkSmartPointer<vtkThreshold> threshold = vtkSmartPointer<vtkThreshold>::New();
+        threshold->SetInputData(connectivityFilter->GetOutput());
+        threshold->ThresholdBetween((double)i, (double)i);
+        threshold->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "RegionId");
+        threshold->Update();
+        omega_i->ShallowCopy(threshold->GetOutput());
+        cout << "omega_i->GetActualMemorySize("<<i<<") = " << omega_i->GetActualMemorySize() << endl;
+        decomposeRegion(omega_i, PartitionId, _nparts, prevPartitionId);
+        prevPartitionId += _nparts;
+
+        //  string fname2 = "dmpFls/Omega_"+to_string(i)+".vtu";
+        //  printVTK(omega_i,fname2);
+    }
+
+
+
+//#if 0
+
+    string fname = "dmpFls/modifiedFile_" + to_string(_nparts) + "_subs.vtu";
     vtkSmartPointer<vtkUnstructuredGrid> ModelMesh = vtkSmartPointer<vtkUnstructuredGrid>::New();
-    ModelMesh->ShallowCopy(imesh->GetOutput());
+    ModelMesh->ShallowCopy(meshGlobal->GetOutput());
     printVTK(ModelMesh,fname);
-#endif
+//#endif
 
     if (!flagPartitionId){
        PartitionId->Delete();
