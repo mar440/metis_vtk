@@ -33,7 +33,7 @@
 #include "metis.h"
 
 using namespace std;
-bool asciiOrBinaryVtu = false;
+bool asciiOrBinaryVtu = true;
 
 void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fname){
     cout <<"vtkVersion: " << vtkVersion::GetVTKMajorVersion() << "\n";
@@ -73,12 +73,9 @@ int main(int argc, char *argv[])
     //read all the data from the file
     vtkSmartPointer<vtkXMLUnstructuredGridReader> imesh =
             vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
+    cout << " ===============================================\n";
 
     imesh->SetFileName(filename.c_str());
-    if (imesh = NULL){
-        cout << "imesh does not contain data ...\n" ;
-        return(1);
-    }
     imesh->Update();
 
     int _i, nCellArr = imesh->GetNumberOfCellArrays();
