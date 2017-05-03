@@ -73,7 +73,12 @@ int main(int argc, char *argv[])
     //read all the data from the file
     vtkSmartPointer<vtkXMLUnstructuredGridReader> imesh =
             vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
+
     imesh->SetFileName(filename.c_str());
+    if (imesh = NULL){
+        cout << "imesh does not contain data ...\n" ;
+        return(1);
+    }
     imesh->Update();
 
     int _i, nCellArr = imesh->GetNumberOfCellArrays();
@@ -102,11 +107,6 @@ int main(int argc, char *argv[])
         PartitionId->SetNumberOfComponents(1);
         PartitionId->SetNumberOfTuples(nb_elmt);
     }
-
-
-
-
-
 
 #if 1
     vtkSmartPointer<vtkGenericCell> cell = vtkSmartPointer<vtkGenericCell>::New();
