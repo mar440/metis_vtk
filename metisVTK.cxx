@@ -35,14 +35,7 @@
 #include <vtkIdTypeArray.h>
 
 using namespace std;
-bool asciiOrBinaryVtu = true;
-
-
-//#ifndef VTK_CREATE
-// // To create a smart pointer
-//#define VTK_CREATE(type, name) \
-//    vtkSmartPointer<type> name = vtkSmartPointer<type>::New()
-//#endif
+bool ASCII_OR_BINARY_VTU = true;
 
 
 void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fname){
@@ -50,7 +43,7 @@ void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fnam
     vtkSmartPointer<vtkXMLUnstructuredGridWriter> writer =
             vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
     writer->SetFileName(fname.c_str());
-    if (asciiOrBinaryVtu){
+    if (ASCII_OR_BINARY_VTU){
         writer->SetDataModeToAscii();
     }
     else{
@@ -155,8 +148,6 @@ void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkSmartPo
         globalPartitionId->SetTuple(_i,tuple);
     }
 
-   // mesh_local->AddArray(PartitionId);
-
     delete [] epart;
     delete [] npart;
     delete [] eptr;
@@ -164,44 +155,6 @@ void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkSmartPo
 
 }
 
-
-//vtkUnstructuredGrid* ThresoldSelection(vtkUnstructuredGrid* usg, std::string fieldName, std::vector<int> values)
-//{
-//    if (values.size() == 1)
-//    {
-//        //WriteUG(usg, "C:\\Users\\a0h72255\\Desktop\\test.vtu");
-//        VTK_CREATE(vtkThreshold, threshold);
-//        threshold->SetInputData(usg);
-//        threshold->ThresholdBetween(values[0] - 0.1, values[0] + 0.1);
-//        threshold->SetInputArrayToProcess(0, 0, 0, 1, fieldName.c_str());
-//        threshold->Update();
-//
-//        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
-//        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(threshold->GetOutput()));
-//        return res;
-//    }
-//    // else make an append filter of all the material ids
-//    else
-//    {
-//        VTK_CREATE(vtkAppendFilter, aFilter);
-//        aFilter->MergePointsOff();
-//        for (auto i : values)
-//        {
-//            VTK_CREATE(vtkThreshold, threshold);
-//            threshold->SetInputData(usg);
-//            threshold->ThresholdBetween(i - 0.1, i + 0.1);
-//            threshold->SetInputArrayToProcess(0, 0, 0, 1, fieldName.c_str());
-//            threshold->Update();
-//
-//            aFilter->AddInputData(threshold->GetOutput());
-//        }
-//
-//        aFilter->Update();
-//        vtkUnstructuredGrid* res = vtkUnstructuredGrid::New();
-//        res->ShallowCopy(vtkUnstructuredGrid::SafeDownCast(aFilter->GetOutput()));
-//        return res;
-//    }
-//}
 
 int main(int argc, char *argv[])
 {
@@ -221,6 +174,11 @@ int main(int argc, char *argv[])
     cout << "numb. of inp.             " << argc << endl;
     cout << "file name to be readed is " << filename << endl;
     cout << "nparts from command line: " << _nparts << endl;
+
+    int nparts;
+    if (_nparts > 0 ){
+       nparts = _nparts;
+    }
 
 
     //read all the data from the file
@@ -284,7 +242,7 @@ int main(int argc, char *argv[])
     vector < double > nPartsPerRegion;
     nPartsPerRegion.resize(nRegions);
 
-    int nAverCellsPerRegion = nCellsGlobal / nRegions;
+    int nAverCellsPerRegion = nCellsGlobal / nparts;
 
 
     for (int i = 0; i < nRegions; i ++) {
@@ -300,11 +258,15 @@ int main(int argc, char *argv[])
         nPartsPerRegion[i] = double( nCellsPerRegion[i]) / nAverCellsPerRegion;
     }
 
+        cout <<"=========================================="<< endl;
+        cout <<"Global numb.of cells: "<<nCellsGlobal << endl;
+        cout <<"=========================================="<< endl;
+        cout <<"given numb. of parts = " << nparts << endl;
     for (int i = 0; i < nRegions; i++){
-        cout <<"=========================================="<< endl;
-        cout <<"nPartsPerRegion  = " << nPartsPerRegion[i] << endl;
-        cout <<"=========================================="<< endl;
+        cout <<".........................................."<< endl;
+        cout <<"nPartsPerRegion  =    " << nPartsPerRegion[i] << endl;
     }
+        cout <<"=========================================="<< endl;
 
 
 
@@ -318,8 +280,10 @@ int main(int argc, char *argv[])
         threshold->Update();
         omega_i->ShallowCopy(threshold->GetOutput());
         cout << "omega_i->GetActualMemorySize("<<i<<") = " << omega_i->GetActualMemorySize() << endl;
-        decomposeRegion(omega_i, PartitionId, _nparts, prevPartitionId);
-        prevPartitionId += _nparts;
+
+        int __nparts = ceil(nPartsPerRegion[i]);
+        decomposeRegion(omega_i, PartitionId, __nparts, prevPartitionId);
+        prevPartitionId += nparts;
 
         //  string fname2 = "dmpFls/Omega_"+to_string(i)+".vtu";
         //  printVTK(omega_i,fname2);
@@ -329,7 +293,7 @@ int main(int argc, char *argv[])
 
 //#if 0
 
-    string fname = "dmpFls/modifiedFile_" + to_string(_nparts) + "_subs.vtu";
+    string fname = "dmpFls/modifiedFile_" + to_string(nparts) + "_subs.vtu";
     vtkSmartPointer<vtkUnstructuredGrid> ModelMesh = vtkSmartPointer<vtkUnstructuredGrid>::New();
     ModelMesh->ShallowCopy(meshGlobal->GetOutput());
     printVTK(ModelMesh,fname);
