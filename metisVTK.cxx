@@ -28,18 +28,12 @@
 #include <vtkInformation.h>
 #include <vtkUnstructuredGridGeometryFilter.h>
 #include <vtkAppendFilter.h>
-// MPI
-//#include "mpi.h"
-//#include <openmpi.h>
 #include <set>
 #include <stdexcept>
 #include "metis.h"
 
-
-
 using namespace std;
-bool asciiOrBinaryVtu = true;
-
+bool asciiOrBinaryVtu = false;
 
 void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fname){
     cout <<"vtkVersion: " << vtkVersion::GetVTKMajorVersion() << "\n";
@@ -55,8 +49,6 @@ void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fnam
     writer->SetInputData(_unstructuredGrid);
     writer->Write();
 }
-
-
 
 int main(int argc, char *argv[])
 {
@@ -90,7 +82,7 @@ int main(int argc, char *argv[])
     for (_i = 0; _i < nCellArr ; _i++) {
         str_i = imesh->GetCellArrayName(_i);
         if (str_i.compare("PartitionId") == 0){
-            bool flagPartitionId = true;
+            flagPartitionId = true;
             break;
         }
     }
@@ -104,13 +96,17 @@ int main(int argc, char *argv[])
          PartitionId = imesh->GetOutput()->GetCellData()->GetArray("PartitionId");
     }
     else{
-    //    vtkSmartPointer<vtkIntArray> _vtkDataArray_PartId = vtkSmartPointer<vtkIntArray>::New();
         PartitionId = vtkIntArray::New();
         imesh->GetOutput()->GetCellData()->AddArray(PartitionId);
         PartitionId->SetName("PartitionId");
         PartitionId->SetNumberOfComponents(1);
         PartitionId->SetNumberOfTuples(nb_elmt);
     }
+
+
+
+
+
 
 #if 1
     vtkSmartPointer<vtkGenericCell> cell = vtkSmartPointer<vtkGenericCell>::New();
@@ -180,7 +176,7 @@ int main(int argc, char *argv[])
                        (int *)NULL,     // vsize                                Y
                        &ncommon,        //                                      Y
                        &nparts,         //                                      N
-                       (real_t*)NULL,  // tpwgts                                Y
+                       (real_t*)NULL,   // tpwgts                                Y
                        options,         //                                      Y
                        &objval,         //                                      Y
                        epart,           //                                      N
@@ -195,13 +191,10 @@ int main(int argc, char *argv[])
 
    // imesh->AddArray(PartitionId);
 
-
-
     delete [] epart;
     delete [] npart;
     delete [] eptr;
     delete [] eind;
-
 
     string fname = "dmpFls/modifiedFile_" + to_string(nparts) + "_subs.vtu";
     vtkSmartPointer<vtkUnstructuredGrid> ModelMesh = vtkSmartPointer<vtkUnstructuredGrid>::New();
