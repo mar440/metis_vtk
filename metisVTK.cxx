@@ -242,9 +242,14 @@ int main(int argc, char *argv[])
     vector < double > nPartsPerRegion;
     nPartsPerRegion.resize(nRegions);
 
-    int nAverCellsPerRegion = nCellsGlobal / nparts;
+    double nAverCellsPerRegion = double(nCellsGlobal) / nparts;
+        cout <<"aver. # el. per sub=  " << nAverCellsPerRegion  << endl;
 
-
+        cout <<"=========================================="<< endl;
+        cout <<"Global numb.of cells: "<<nCellsGlobal << endl;
+        cout <<"=========================================="<< endl;
+        cout <<"given numb. of parts = " << nparts << endl;
+    double __nparts;
     for (int i = 0; i < nRegions; i ++) {
         vtkSmartPointer <vtkUnstructuredGrid> omega_i = vtkSmartPointer< vtkUnstructuredGrid>::New();
         vtkSmartPointer<vtkThreshold> threshold = vtkSmartPointer<vtkThreshold>::New();
@@ -255,17 +260,17 @@ int main(int argc, char *argv[])
         omega_i->ShallowCopy(threshold->GetOutput());
 
         nCellsPerRegion[i] = omega_i->GetNumberOfCells();
-        nPartsPerRegion[i] = double( nCellsPerRegion[i]) / nAverCellsPerRegion;
+        __nparts = double( nCellsPerRegion[i]) / nAverCellsPerRegion;
+        nPartsPerRegion[i] = round(__nparts);
+        if (nPartsPerRegion[i] == 0)
+            nPartsPerRegion[i] = 1;
+
+        cout <<".........................................."     << endl;
+        cout <<"nPartsPerRegion  =    " << __nparts             << endl;
+        cout <<"nPartsPerRegion  =    " << nPartsPerRegion[i]   << endl;
+        cout <<"nCellsPerRegion  =    " << nCellsPerRegion[i]   << endl;
     }
 
-        cout <<"=========================================="<< endl;
-        cout <<"Global numb.of cells: "<<nCellsGlobal << endl;
-        cout <<"=========================================="<< endl;
-        cout <<"given numb. of parts = " << nparts << endl;
-    for (int i = 0; i < nRegions; i++){
-        cout <<".........................................."<< endl;
-        cout <<"nPartsPerRegion  =    " << nPartsPerRegion[i] << endl;
-    }
         cout <<"=========================================="<< endl;
 
 
@@ -281,9 +286,8 @@ int main(int argc, char *argv[])
         omega_i->ShallowCopy(threshold->GetOutput());
         cout << "omega_i->GetActualMemorySize("<<i<<") = " << omega_i->GetActualMemorySize() << endl;
 
-        int __nparts = ceil(nPartsPerRegion[i]);
-        decomposeRegion(omega_i, PartitionId, __nparts, prevPartitionId);
-        prevPartitionId += nparts;
+        decomposeRegion(omega_i, PartitionId, nPartsPerRegion[i], prevPartitionId);
+        prevPartitionId += nPartsPerRegion[i];
 
         //  string fname2 = "dmpFls/Omega_"+to_string(i)+".vtu";
         //  printVTK(omega_i,fname2);
@@ -291,9 +295,14 @@ int main(int argc, char *argv[])
 
 
 
+
+    int real_nparts = prevPartitionId;
+
+
+
 //#if 0
 
-    string fname = "dmpFls/modifiedFile_" + to_string(nparts) + "_subs.vtu";
+    string fname = "dmpFls/modifiedFile_" + to_string(real_nparts) + "_subs.vtu";
     vtkSmartPointer<vtkUnstructuredGrid> ModelMesh = vtkSmartPointer<vtkUnstructuredGrid>::New();
     ModelMesh->ShallowCopy(meshGlobal->GetOutput());
     printVTK(ModelMesh,fname);
