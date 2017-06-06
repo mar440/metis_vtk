@@ -20,6 +20,7 @@
 #include <vtkGenericCell.h>
 #include <string>
 
+
 // To extract a sub part
 #include <vtkThreshold.h>
 #include <vtkSelection.h>
@@ -33,6 +34,7 @@
 #include "metis.h"
 #include <vtkConnectivityFilter.h>
 #include <vtkIdTypeArray.h>
+#include <iostream>
 
 using namespace std;
 bool ASCII_OR_BINARY_VTU = true;
@@ -222,6 +224,7 @@ int main(int argc, char *argv[])
     }
 
 
+
     vtkSmartPointer<vtkConnectivityFilter> connectivityFilter =
     vtkSmartPointer<vtkConnectivityFilter>::New();
     connectivityFilter->SetInputConnection(meshGlobal->GetOutputPort());
@@ -302,14 +305,87 @@ int main(int argc, char *argv[])
 
 //#if 0
 
-    string fname = "dmpFls/modifiedFile_" + to_string(real_nparts) + "_subs.vtu";
+
+
+    /* Extraction of original file name from the 'path'*/
+    stringstream ss1(filename);
+    vector <string> result;
+
+    while (ss1.good() )
+    {
+        string substr;
+        getline (ss1, substr, '/');
+        result.push_back( substr );
+    }
+
+    stringstream ss2(result[result.size() - 1]);
+    result.clear();
+    result.shrink_to_fit();
+
+    while (ss2.good() )
+    {
+        string substr;
+        getline (ss2, substr, '.');
+        result.push_back( substr );
+    }
+    cout << result.size() << endl;
+    cout << result[0]<< endl;
+  /* ------------------ */
+    string fname = result[0] + "_" + to_string(real_nparts) + "_subs.vtu";
+
     vtkSmartPointer<vtkUnstructuredGrid> ModelMesh = vtkSmartPointer<vtkUnstructuredGrid>::New();
     ModelMesh->ShallowCopy(meshGlobal->GetOutput());
     printVTK(ModelMesh,fname);
+
+
+
+   int  nPointArr = meshGlobal->GetNumberOfPointArrays();
+   str_i;
+   bool flagdisplace = false;
+   for (_i = 0; _i < nPointArr ; _i++) {
+       str_i = meshGlobal->GetPointArrayName(_i);
+       if (str_i.compare("displace") == 0){
+           flagdisplace = true;
+           break;
+       }
+   }
+    vtkDataArray * displace;
+    if (flagdisplace){
+        displace = meshGlobal->GetOutput()->GetPointData()->GetArray("displace");
+        ofstream myfile;
+        string fname1 = result[0] + "_displace.txt";
+        myfile.open (fname1);
+        string dataType = displace->GetDataTypeAsString();
+        cout << " ++++++++++++++++++++++  " << dataType << endl;
+        cout << " ++++++++++++++++++++++  " << displace->GetDataSize()<< endl;
+        cout << " ++++++++++++++++++++++  " << displace->GetNumberOfComponents()<< endl;
+        cout << " ++++++++++++++++++++++  " << displace->GetSize()<< endl;
+
+//        double *u_i;
+        double * u_i = new double[3];
+        for (int i = 0; i < displace->GetNumberOfTuples();i++){
+            u_i = displace->GetTuple3(i);
+            for (int j = 0; j < displace->GetNumberOfComponents();j++) {
+                myfile << u_i[j] << " ";
+            }
+            myfile << endl;
+        }
+        myfile.close();
+    }
+
+
+
+
+
+
+
+
 //#endif
 
-    if (!flagPartitionId){
+    if (!flagPartitionId)
        PartitionId->Delete();
+    if (!flagdisplace){
+        displace->Delete();
     }
     return EXIT_SUCCESS;
 }
