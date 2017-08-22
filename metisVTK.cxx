@@ -1,3 +1,21 @@
+//
+//  Decomposition of 3D mesh
+//  Author: A. Markopuolos
+//  rev.    20170822
+//
+//  Application
+//      ./metisVTK path_to_vtu_file X
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
 #include <vtkVersion.h>
 #include <vtkSmartPointer.h>
 #include <vtkHexahedron.h>
@@ -33,7 +51,7 @@
 #include <stdexcept>
 #include "metis.h"
 #include <vtkConnectivityFilter.h>
-#include <vtkIdTypeArray.h>
+//#include <vtkIdTypeArray.h>
 #include <iostream>
 
 using namespace std;
@@ -204,9 +222,15 @@ int main(int argc, char *argv[])
     cout << "meshGlobal->GetNumberOfPoints() = " << nPointsGlobal << endl;
     cout << "meshGlobal->GetNumberOfCells()" << nCellsGlobal<< endl;
 
-    vtkDataArray * PartitionId;
+
+
+
+    //vtkDataArray * PartitionId;
+    vtkSmartPointer< vtkDataArray > PartitionId;
+
+
     if (flagPartitionId){
-         PartitionId = meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId");
+        PartitionId = meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId");
     }
     else{
         PartitionId = vtkIntArray::New();
@@ -246,13 +270,14 @@ int main(int argc, char *argv[])
     nPartsPerRegion.resize(nRegions);
 
     double nAverCellsPerRegion = double(nCellsGlobal) / nparts;
-        cout <<"aver. # el. per sub=  " << nAverCellsPerRegion  << endl;
+        cout <<"aver. # el. per sub = " << nAverCellsPerRegion  << endl;
 
         cout <<"=========================================="<< endl;
         cout <<"Global numb.of cells: "<<nCellsGlobal << endl;
         cout <<"=========================================="<< endl;
         cout <<"given numb. of parts = " << nparts << endl;
     double __nparts;
+
     for (int i = 0; i < nRegions; i ++) {
         vtkSmartPointer <vtkUnstructuredGrid> omega_i = vtkSmartPointer< vtkUnstructuredGrid>::New();
         vtkSmartPointer<vtkThreshold> threshold = vtkSmartPointer<vtkThreshold>::New();
@@ -296,16 +321,7 @@ int main(int argc, char *argv[])
         //  printVTK(omega_i,fname2);
     }
 
-
-
-
     int real_nparts = prevPartitionId;
-
-
-
-//#if 0
-
-
 
     /* Extraction of original file name from the 'path'*/
     stringstream ss1(filename);
@@ -338,18 +354,18 @@ int main(int argc, char *argv[])
     printVTK(ModelMesh,fname);
 
 
-
-   int  nPointArr = meshGlobal->GetNumberOfPointArrays();
-   str_i;
-   bool flagdisplace = false;
-   for (_i = 0; _i < nPointArr ; _i++) {
-       str_i = meshGlobal->GetPointArrayName(_i);
-       if (str_i.compare("displace") == 0){
-           flagdisplace = true;
-           break;
-       }
-   }
-    vtkDataArray * displace;
+#if 0
+    int  nPointArr = meshGlobal->GetNumberOfPointArrays();
+    str_i;
+    bool flagdisplace = false;
+    for (_i = 0; _i < nPointArr ; _i++) {
+        str_i = meshGlobal->GetPointArrayName(_i);
+        if (str_i.compare("displace") == 0){
+            flagdisplace = true;
+            break;
+        }
+    }
+    vtkSmartPointer< vtkDataArray > displace;
     if (flagdisplace){
         displace = meshGlobal->GetOutput()->GetPointData()->GetArray("displace");
         ofstream myfile;
@@ -360,33 +376,21 @@ int main(int argc, char *argv[])
         cout << " ++++++++++++++++++++++  " << displace->GetDataSize()<< endl;
         cout << " ++++++++++++++++++++++  " << displace->GetNumberOfComponents()<< endl;
         cout << " ++++++++++++++++++++++  " << displace->GetSize()<< endl;
-
-//        double *u_i;
-        double * u_i = new double[3];
+        double  u_i[3];
+        double  *pu_i;
+        pu_i = u_i;
         for (int i = 0; i < displace->GetNumberOfTuples();i++){
-            u_i = displace->GetTuple3(i);
+            pu_i = displace->GetTuple3(i);
             for (int j = 0; j < displace->GetNumberOfComponents();j++) {
-                myfile << u_i[j] << " ";
+                myfile << pu_i[j] << " ";
             }
             myfile << endl;
         }
         myfile.close();
     }
+#endif
 
 
-
-
-
-
-
-
-//#endif
-
-    if (!flagPartitionId)
-       PartitionId->Delete();
-    if (!flagdisplace){
-        displace->Delete();
-    }
     return EXIT_SUCCESS;
 }
 
