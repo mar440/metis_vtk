@@ -14,7 +14,7 @@
 //                                                                                     +
 //     NOTE:                                                                           +
 //     If mesh contains disjoned parts, it may happen,                                 +
-//     required number of subdomains will be not satisfied (due to load ballancig).    +
+//     required number of subdomains will be not satisfied (due to load balancig).     +
 //                                                                                     +
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #include <vtkVersion.h>
@@ -227,13 +227,16 @@ int main(int argc, char *argv[])
 
 
     //vtkDataArray * PartitionId;
-    vtkSmartPointer< vtkDataArray > PartitionId;
+    //vtkSmartPointer< vtkDataArray > PartitionId;
+    vtkSmartPointer< vtkIntArray > PartitionId;
 
 
     if (flagPartitionId){
-        PartitionId = meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId");
+//        PartitionId = meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId");
+        PartitionId = vtkIntArray::SafeDownCast(meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId"));
     }
     else{
+//        PartitionId = vtkIntArray::New();
         PartitionId = vtkIntArray::New();
         meshGlobal->GetOutput()->GetCellData()->AddArray(PartitionId);
         PartitionId->SetName("PartitionId");
@@ -252,7 +255,8 @@ int main(int argc, char *argv[])
 
     vtkSmartPointer<vtkConnectivityFilter> connectivityFilter =
     vtkSmartPointer<vtkConnectivityFilter>::New();
-    connectivityFilter->SetInputConnection(meshGlobal->GetOutputPort());
+    //connectivityFilter->SetInputConnection(meshGlobal->GetOutputPort());
+    connectivityFilter->SetInputData(meshGlobal->GetOutput());
     connectivityFilter->SetExtractionModeToAllRegions();
     connectivityFilter->ColorRegionsOn();
     connectivityFilter->Update();
