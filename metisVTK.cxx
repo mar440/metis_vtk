@@ -1,21 +1,22 @@
-//
-//  Decomposition of 3D mesh
-//  Author: A. Markopuolos
-//  rev.    20170822
-//
-//  Application
-//      ./metisVTK path_to_vtu_file X
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//                                                                                     +
+//     DECOMPOSITION OF 3D MESH                                                        +
+//     ========================                                                        +
+//     author:     A. Markopuolos                                                      +
+//     revison:    20170822                                                            +
+//                                                                                     +
+//     LAUNCHING:                                                                      +
+//                                                                                     +
+//         $ ./metisVTK path_to_vtu_file X                                             +
+//                                                                                     +
+//     with parameters + path_to_vtu_file - path to the vtu file with mesh,            +
+//                     + X - required number of subdomains.                            +
+//                                                                                     +
+//     NOTE:                                                                           +
+//     If mesh contains disjoned parts, it may happen,                                 +
+//     required number of subdomains will be not satisfied (due to load ballancig).    +
+//                                                                                     +
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #include <vtkVersion.h>
 #include <vtkSmartPointer.h>
 #include <vtkHexahedron.h>

@@ -35,3 +35,5 @@ build/
 *.sw*
 CMakeLists.txt.user
 /build_orig/
+
+*autosave
