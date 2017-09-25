@@ -4,13 +4,7 @@ cmake_minimum_required(VERSION 2.8)
 
 PROJECT(testVTK CXX)
 
-
-
-
-
-
-
-SET (METIS_LIBRARIES 
+SET (METIS_LIBRARIES
     "/data_space/france/metis-5.1.0/build/Linux-x86_64/libmetis/libmetis.a" 
     CACHE PATH "mydoc")
 SET (METIS_INCLUDEDIRS 

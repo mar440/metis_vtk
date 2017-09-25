@@ -226,8 +226,6 @@ int main(int argc, char *argv[])
 
 
 
-    //vtkDataArray * PartitionId;
-    //vtkSmartPointer< vtkDataArray > PartitionId;
     vtkSmartPointer< vtkIntArray > PartitionId;
 
 
