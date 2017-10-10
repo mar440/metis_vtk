@@ -75,7 +75,7 @@ void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fnam
 }
 
 
-void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkSmartPointer<vtkDataArray> globalPartitionId, int _nparts, int prevPartitionId){
+void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkDataArray * globalPartitionId, int _nparts, int prevPartitionId){
 
     int nPointsLocal = mesh_local->GetNumberOfPoints();
     int nCellsLocal = mesh_local->GetNumberOfCells();
@@ -156,15 +156,12 @@ void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkSmartPo
     double tuple[] = {0};
     int _i;
 
-    vtkDataArray * localPartitionId;
-    localPartitionId = mesh_local->GetCellData()->GetArray("PartitionId");
-
 
     for (int i = 0 ; i < nCellsLocal; i++){
         /* global PartitionId */
         tuple[0] = epart[i] + prevPartitionId;
         /* first: recovering the position of cell in original 'mesh_local' */
-        _i = localPartitionId->GetTuple1(i);
+        _i = mesh_local->GetCellData()->GetArray("PartitionId")->GetTuple1(i);
         /* second: replacing by localPartitionId + (number of partitions of all previous Regions) */
         globalPartitionId->SetTuple(_i,tuple);
     }
@@ -221,21 +218,11 @@ int main(int argc, char *argv[])
     int nPointsGlobal = meshGlobal->GetNumberOfPoints();
     int nCellsGlobal= meshGlobal->GetNumberOfCells();
     cout << "meshGlobal->GetNumberOfPoints() = " << nPointsGlobal << endl;
-    cout << "meshGlobal->GetNumberOfCells()" << nCellsGlobal<< endl;
+    cout << "meshGlobal->GetNumberOfCells()  = " << nCellsGlobal<< endl;
 
 
-
-
-    vtkSmartPointer< vtkIntArray > PartitionId;
-
-
-    if (flagPartitionId){
-//        PartitionId = meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId");
-        PartitionId = vtkIntArray::SafeDownCast(meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId"));
-    }
-    else{
-//        PartitionId = vtkIntArray::New();
-        PartitionId = vtkIntArray::New();
+    if (!flagPartitionId){
+        vtkIntArray * PartitionId = vtkIntArray::New();
         meshGlobal->GetOutput()->GetCellData()->AddArray(PartitionId);
         PartitionId->SetName("PartitionId");
         PartitionId->SetNumberOfComponents(1);
@@ -243,10 +230,14 @@ int main(int argc, char *argv[])
     }
 
     /* Partition is firstly used to store original order of cells */
+
+    //int xxx = meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId")->GetNumberOfTuples();
+//    vtkSmartPointer< vtkIntArray > PartitionId = ;
+
     double tuple[] = {0};
     for (int i = 0 ; i < nCellsGlobal; i++){
         tuple[0] = i;
-        PartitionId->SetTuple(i,tuple);
+        meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId")->SetTuple(i,tuple);
     }
 
 
@@ -317,7 +308,7 @@ int main(int argc, char *argv[])
         omega_i->ShallowCopy(threshold->GetOutput());
         cout << "omega_i->GetActualMemorySize("<<i<<") = " << omega_i->GetActualMemorySize() << endl;
 
-        decomposeRegion(omega_i, PartitionId, nPartsPerRegion[i], prevPartitionId);
+        decomposeRegion(omega_i, meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId"), nPartsPerRegion[i], prevPartitionId);
         prevPartitionId += nPartsPerRegion[i];
 
         //  string fname2 = "dmpFls/Omega_"+to_string(i)+".vtu";
