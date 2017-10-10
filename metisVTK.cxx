@@ -138,25 +138,35 @@ void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkDataArr
     int *epart = new int [nCellsLocal];
     int *npart = new int [eptr[nCellsLocal]];
 
-    METIS_PartMeshDual(&nCellsLocal,    // number of elements in the mesh       Y
-                       &nPointsLocal,   //                                      Y
-                       eptr,            //                                      Y
-                       eind,            //                                      Y
-                       (int *)NULL,     // vwgt                                 Y
-                       (int *)NULL,     // vsize                                Y
-                       &ncommon,        //                                      Y
-                       &nparts,         //                                      N
-                       (real_t*)NULL,   // tpwgts                               Y
-                       options,         //                                      Y
-                       &objval,         //                                      Y
-                       epart,           //                                      N
-                       npart);          //                                      Y
+    if (nparts > 1){
+        METIS_PartMeshDual(&nCellsLocal,    // number of elements in the mesh       Y
+                           &nPointsLocal,   //                                      Y
+                           eptr,            //                                      Y
+                           eind,            //                                      Y
+                           (int *)NULL,     // vwgt                                 Y
+                           (int *)NULL,     // vsize                                Y
+                           &ncommon,        //                                      Y
+                           &nparts,         //                                      N
+                           (real_t*)NULL,   // tpwgts                               Y
+                           options,         //                                      Y
+                           &objval,         //                                      Y
+                           epart,           //                                      N
+                           npart);          //                                      Y
+    }
+    else {
+        for (int i = 0; i < nCellsLocal; i++)
+            epart[i] = 0;
+
+    }
 
 
     double tuple[] = {0};
     int _i;
 
 
+#define DBG0
+
+    // if metis returns undecomposed graph, epart[i] = 1
     for (int i = 0 ; i < nCellsLocal; i++){
         /* global PartitionId */
         tuple[0] = epart[i] + prevPartitionId;
