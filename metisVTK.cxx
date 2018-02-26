@@ -3,14 +3,14 @@
 //     DECOMPOSITION OF 3D MESH USING METIS                                            +
 //     ===================================                                             +
 //     author:     A. Markopuolos                                                      +
-//     revison:    20170822                                                            +
+//     revison:    20180214                                                            +
 //                                                                                     +
 //     LAUNCHING:                                                                      +
 //                                                                                     +
 //         $ ./metisVTK path_to_vtu_file X                                             +
 //                                                                                     +
-//     with parameters + path_to_vtu_file - path to the vtu file with mesh,            +
-//                     + X - required number of subdomains.                            +
+//     with parameters - path_to_vtu_file - path to the vtu file with mesh,            +
+//                     - X - required number of subdomains.                            +
 //                                                                                     +
 //     NOTE:                                                                           +
 //     If mesh contains disjoned parts, it may happen,                                 +
@@ -51,14 +51,102 @@
 #include <set>
 #include <stdexcept>
 #include "metis.h"
-#include <vtkConnectivityFilter.h>
-//#include <vtkIdTypeArray.h>
+#include <vtkConnectivityFilter.h> 
 #include <iostream>
+// tmp headres
+ #include <vtkProperty.h>
+ 
+
 
 using namespace std;
 bool ASCII_OR_BINARY_VTU = true;
 
+#ifndef VTK_CREATE
+// To create a smart pointer
+#define VTK_CREATE(type, name) \
+    vtkSmartPointer<type> name = vtkSmartPointer<type>::New()
+#endif
+  
+#include "vtkCommonCoreModule.h" // For export macro
+#include "vtkOutputWindow.h"
+#include <vtkObjectFactory.h>
 
+class vtkLogOutputWindow : public vtkOutputWindow
+{
+public:
+	vtkTypeMacro(vtkLogOutputWindow, vtkOutputWindow);
+
+	static vtkLogOutputWindow* New();
+
+	virtual void PrintSelf(ostream& os, vtkIndent indent);
+
+	// Description:
+	// Put the text into the log file.
+	// New lines are converted to carriage return new lines.
+	virtual void DisplayText(const char*);
+
+	// Description:
+	// Sets the name for the log file.
+	vtkSetStringMacro(FileName);
+	vtkGetStringMacro(FileName);
+
+	// Description:
+	// Turns on buffer flushing for the output
+	// to the log file.
+	vtkSetMacro(Flush, int);
+	vtkGetMacro(Flush, int);
+	vtkBooleanMacro(Flush, int);
+
+	// Description:
+	// Setting append will cause the log file to be
+	// opened in append mode.  Otherwise, if the log file exists,
+	// it will be overwritten each time the vtkLogOutputWindow
+	// is created.
+	vtkSetMacro(Append, int);
+	vtkGetMacro(Append, int);
+	vtkBooleanMacro(Append, int);
+
+protected:
+	vtkLogOutputWindow();
+	virtual ~vtkLogOutputWindow();
+	void Initialize();
+
+	char* FileName;
+	std::ofstream* OStream;
+	int Flush;
+	int Append;
+
+private:
+	vtkLogOutputWindow(const vtkLogOutputWindow&);  // Not implemented.
+	void operator=(const vtkLogOutputWindow&);  // Not implemented.
+};
+
+ 
+
+vtkStandardNewMacro(vtkLogOutputWindow);
+
+vtkLogOutputWindow::vtkLogOutputWindow()
+{
+	this->OStream = NULL;
+	this->FileName = NULL;
+	this->Append = 0;
+	this->Flush = 0;
+}
+
+vtkLogOutputWindow::~vtkLogOutputWindow()
+{
+	delete[] this->FileName;
+	delete this->OStream;
+}
+
+void vtkLogOutputWindow::Initialize(){}
+
+void vtkLogOutputWindow::DisplayText(const char* text)
+{	if (!text){return;}	std::cerr << text << endl;}
+
+void vtkLogOutputWindow::PrintSelf(ostream& os, vtkIndent indent)
+{	this->Superclass::PrintSelf(os, indent);}
+  
 void printVTK(vtkSmartPointer<vtkUnstructuredGrid> _unstructuredGrid,string fname){
     cout <<"vtkVersion: " << vtkVersion::GetVTKMajorVersion() << "\n";
     vtkSmartPointer<vtkXMLUnstructuredGridWriter> writer =
@@ -91,7 +179,8 @@ void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkDataArr
     }
     int * eind = new int[eptr[nCellsLocal]];
     int cnt = 0;
-    int CellDim;
+	// TODO CellDim was not initialize ... check if 0 is appropriate ...
+    int CellDim = 0 ;
     for (int i = 0 ; i < nCellsLocal; i++){
         mesh_local->GetCell(i,cell);
         nPi = cell->GetNumberOfPoints();
@@ -153,27 +242,24 @@ void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkDataArr
                            epart,           //                                      N
                            npart);          //                                      Y
     }
-    else {
+    else 
         for (int i = 0; i < nCellsLocal; i++)
             epart[i] = 0;
 
-    }
-
-
-    double tuple[] = {0};
+    double tuple = 0;
     int _i;
 
 
-#define DBG0
+//#define DBG0
 
     // if metis returns undecomposed graph, epart[i] = 1
     for (int i = 0 ; i < nCellsLocal; i++){
         /* global PartitionId */
-        tuple[0] = epart[i] + prevPartitionId;
+        tuple = epart[i] + prevPartitionId;
         /* first: recovering the position of cell in original 'mesh_local' */
         _i = mesh_local->GetCellData()->GetArray("PartitionId")->GetTuple1(i);
         /* second: replacing by localPartitionId + (number of partitions of all previous Regions) */
-        globalPartitionId->SetTuple(_i,tuple);
+        globalPartitionId->SetTuple(_i, &tuple);
     }
 
     delete [] epart;
@@ -183,7 +269,7 @@ void decomposeRegion(vtkSmartPointer<vtkUnstructuredGrid> mesh_local, vtkDataArr
 
 }
 
-
+  
 int main(int argc, char *argv[])
 {
     if (argc != 3){
@@ -204,17 +290,23 @@ int main(int argc, char *argv[])
     cout << "nparts from command line: " << _nparts << endl;
 
     int nparts;
-    if (_nparts > 0 ){
+    if (_nparts > 0 )
        nparts = _nparts;
-    }
 
+	// Redirect VTK errors to cerr
+	VTK_CREATE(vtkLogOutputWindow, vtklog);
+	vtklog->SetInstance(vtklog);
 
     //read all the data from the file
     vtkSmartPointer<vtkXMLUnstructuredGridReader> meshGlobal =
             vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
     meshGlobal->SetFileName(filename.c_str());
     meshGlobal->Update();
-
+    int nPointsGlobal = meshGlobal->GetNumberOfPoints();
+    int nCellsGlobal= meshGlobal->GetNumberOfCells();
+    cout << "meshGlobal->GetNumberOfPoints() = " << nPointsGlobal << endl;
+    cout << "meshGlobal->GetNumberOfCells()  = " << nCellsGlobal<< endl;
+ 
     int _i, nCellArr = meshGlobal->GetNumberOfCellArrays();
     string str_i;
     bool flagPartitionId = false;
@@ -225,47 +317,30 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    int nPointsGlobal = meshGlobal->GetNumberOfPoints();
-    int nCellsGlobal= meshGlobal->GetNumberOfCells();
-    cout << "meshGlobal->GetNumberOfPoints() = " << nPointsGlobal << endl;
-    cout << "meshGlobal->GetNumberOfCells()  = " << nCellsGlobal<< endl;
-
-
+	 
     if (!flagPartitionId){
         vtkIntArray * PartitionId = vtkIntArray::New();
         meshGlobal->GetOutput()->GetCellData()->AddArray(PartitionId);
         PartitionId->SetName("PartitionId");
         PartitionId->SetNumberOfComponents(1);
         PartitionId->SetNumberOfTuples(nCellsGlobal);
-    }
-
-    /* Partition is firstly used to store original order of cells */
-
-    //int xxx = meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId")->GetNumberOfTuples();
-//    vtkSmartPointer< vtkIntArray > PartitionId = ;
-
-    double tuple[] = {0};
+    } 
+    /* Partition is firstly used to store original order of cells */ 
+    double tuple = 0;
     for (int i = 0 ; i < nCellsGlobal; i++){
-        tuple[0] = i;
-        meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId")->SetTuple(i,tuple);
+        tuple = i;
+        meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId")->SetTuple(i,&tuple);
     }
-
-
-
-    vtkSmartPointer<vtkConnectivityFilter> connectivityFilter =
-    vtkSmartPointer<vtkConnectivityFilter>::New();
-    //connectivityFilter->SetInputConnection(meshGlobal->GetOutputPort());
-    connectivityFilter->SetInputData(meshGlobal->GetOutput());
-    connectivityFilter->SetExtractionModeToAllRegions();
-    connectivityFilter->ColorRegionsOn();
-    connectivityFilter->Update();
-    cout << " MEMORY   after del: " << connectivityFilter->GetOutput()->GetActualMemorySize() << endl;
-
-    int nRegions = connectivityFilter->GetNumberOfExtractedRegions();
-
-
-
-
+  
+	vtkSmartPointer<vtkConnectivityFilter> connectivityFilter =
+								vtkSmartPointer<vtkConnectivityFilter>::New();
+	connectivityFilter->SetInputConnection(meshGlobal->GetOutputPort());
+	connectivityFilter->SetExtractionModeToAllRegions();
+	connectivityFilter->ColorRegionsOn();
+	connectivityFilter->Update();
+	
+    int nRegions = connectivityFilter->GetNumberOfExtractedRegions(); 
+	
     /* First: get number of cells per each Region */
     vector < int > nCellsPerRegion;
     nCellsPerRegion.resize(nRegions);
@@ -274,14 +349,13 @@ int main(int argc, char *argv[])
     nPartsPerRegion.resize(nRegions);
 
     double nAverCellsPerRegion = double(nCellsGlobal) / nparts;
-        cout <<"aver. # el. per sub = " << nAverCellsPerRegion  << endl;
-
-        cout <<"=========================================="<< endl;
-        cout <<"Global numb.of cells: "<<nCellsGlobal << endl;
-        cout <<"=========================================="<< endl;
-        cout <<"given numb. of parts = " << nparts << endl;
+    cout <<"aver. # el. per sub = " << nAverCellsPerRegion  << endl;
+    cout <<"=========================================="<< endl;
+    cout <<"Global numb.of cells: "<<nCellsGlobal << endl;
+    cout <<"=========================================="<< endl;
+    cout <<"given numb. of parts = " << nparts << endl;
     double __nparts;
-
+	//
     for (int i = 0; i < nRegions; i ++) {
         vtkSmartPointer <vtkUnstructuredGrid> omega_i = vtkSmartPointer< vtkUnstructuredGrid>::New();
         vtkSmartPointer<vtkThreshold> threshold = vtkSmartPointer<vtkThreshold>::New();
@@ -302,11 +376,9 @@ int main(int argc, char *argv[])
         cout <<"nPartsPerRegion  =    " << nPartsPerRegion[i]   << endl;
         cout <<"nCellsPerRegion  =    " << nCellsPerRegion[i]   << endl;
     }
-
-        cout <<"=========================================="<< endl;
-
-
-
+	//
+	cout <<"=========================================="<< endl;
+	//	
     int prevPartitionId = 0;
     for (int i = 0; i < nRegions; i ++) {
         vtkSmartPointer <vtkUnstructuredGrid> omega_i = vtkSmartPointer< vtkUnstructuredGrid>::New();
@@ -316,21 +388,19 @@ int main(int argc, char *argv[])
         threshold->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "RegionId");
         threshold->Update();
         omega_i->ShallowCopy(threshold->GetOutput());
-        cout << "omega_i->GetActualMemorySize("<<i<<") = " << omega_i->GetActualMemorySize() << endl;
-
+        cout << "omega_i->GetActualMemorySize("<<i<<") = " << omega_i->GetActualMemorySize() << endl; 
         decomposeRegion(omega_i, meshGlobal->GetOutput()->GetCellData()->GetArray("PartitionId"), nPartsPerRegion[i], prevPartitionId);
         prevPartitionId += nPartsPerRegion[i];
-
-        //  string fname2 = "dmpFls/Omega_"+to_string(i)+".vtu";
-        //  printVTK(omega_i,fname2);
     }
-
-    int real_nparts = prevPartitionId;
-
+	//
+    int real_nparts = prevPartitionId; 
     /* Extraction of original file name from the 'path'*/
     stringstream ss1(filename);
     vector <string> result;
 
+
+	//TODO make following as function
+	// - start
     while (ss1.good() )
     {
         string substr;
@@ -350,51 +420,13 @@ int main(int argc, char *argv[])
     }
     cout << result.size() << endl;
     cout << result[0]<< endl;
-  /* ------------------ */
-    string fname = result[0] + "_" + to_string(real_nparts) + "_subs.vtu";
+	// - end
 
-    vtkSmartPointer<vtkUnstructuredGrid> ModelMesh = vtkSmartPointer<vtkUnstructuredGrid>::New();
+	string fname = result[0] + "_" + to_string(real_nparts) + "_subs.vtu";
+	vtkSmartPointer<vtkUnstructuredGrid> ModelMesh = vtkSmartPointer<vtkUnstructuredGrid>::New();
     ModelMesh->ShallowCopy(meshGlobal->GetOutput());
     printVTK(ModelMesh,fname);
-
-
-#if 0
-    int  nPointArr = meshGlobal->GetNumberOfPointArrays();
-    str_i;
-    bool flagdisplace = false;
-    for (_i = 0; _i < nPointArr ; _i++) {
-        str_i = meshGlobal->GetPointArrayName(_i);
-        if (str_i.compare("displace") == 0){
-            flagdisplace = true;
-            break;
-        }
-    }
-    vtkSmartPointer< vtkDataArray > displace;
-    if (flagdisplace){
-        displace = meshGlobal->GetOutput()->GetPointData()->GetArray("displace");
-        ofstream myfile;
-        string fname1 = result[0] + "_displace.txt";
-        myfile.open (fname1);
-        string dataType = displace->GetDataTypeAsString();
-        cout << " ++++++++++++++++++++++  " << dataType << endl;
-        cout << " ++++++++++++++++++++++  " << displace->GetDataSize()<< endl;
-        cout << " ++++++++++++++++++++++  " << displace->GetNumberOfComponents()<< endl;
-        cout << " ++++++++++++++++++++++  " << displace->GetSize()<< endl;
-        double  u_i[3];
-        double  *pu_i;
-        pu_i = u_i;
-        for (int i = 0; i < displace->GetNumberOfTuples();i++){
-            pu_i = displace->GetTuple3(i);
-            for (int j = 0; j < displace->GetNumberOfComponents();j++) {
-                myfile << pu_i[j] << " ";
-            }
-            myfile << endl;
-        }
-        myfile.close();
-    }
-#endif
-
-
+	 
     return EXIT_SUCCESS;
 }
 
